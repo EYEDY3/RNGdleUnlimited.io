@@ -1,0 +1,1343 @@
+<!DOCTYPE html>
+<html lang="en" class="dark h-full bg-slate-950 text-slate-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RNGdle - Infinite RNG & EP Badge Simulator</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Canvas Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        trash: '#64748b',
+                        common: '#a855f7',
+                        uncommon: '#3b82f6',
+                        rare: '#06b6d4',
+                        epic: '#10b981',
+                        anomaly: '#f59e0b',
+                        mythic: '#ef4444'
+                    },
+                    animation: {
+                        'pulse-glow': 'pulseGlow 2s infinite',
+                        'bounce-short': 'bounceShort 0.5s ease',
+                    },
+                    keyframes: {
+                        pulseGlow: {
+                            '0%, 100%': { boxShadow: '0 0 15px rgba(239, 68, 68, 0.4)' },
+                            '50%': { boxShadow: '0 0 30px rgba(239, 68, 68, 0.8)' }
+                        },
+                        bounceShort: {
+                            '0%, 100%': { transform: 'scale(1)' },
+                            '50%': { transform: 'scale(1.05)' }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom scrollbar & glassmorphism */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.6); }
+        ::-webkit-scrollbar-thumb { background: rgba(51, 65, 85, 0.8); border-radius: 9999px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(100, 116, 139, 1); }
+        
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        
+        .badge-card {
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .badge-card:hover {
+            transform: translateY(-2px);
+        }
+        
+        /* Tier Gradients */
+        .bg-tier-trash { background: linear-gradient(135deg, #334155 0%, #1e293b 100%); }
+        .bg-tier-common { background: linear-gradient(135deg, #7e22ce 0%, #4c1d95 100%); }
+        .bg-tier-uncommon { background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%); }
+        .bg-tier-rare { background: linear-gradient(135deg, #0891b2 0%, #155e75 100%); }
+        .bg-tier-epic { background: linear-gradient(135deg, #059669 0%, #064e3b 100%); }
+        .bg-tier-anomaly { background: linear-gradient(135deg, #d97706 0%, #78350f 100%); }
+        .bg-tier-mythic { background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%); }
+
+        .text-tier-trash { color: #94a3b8; }
+        .text-tier-common { color: #c084fc; }
+        .text-tier-uncommon { color: #60a5fa; }
+        .text-tier-rare { color: #22d3ee; }
+        .text-tier-epic { color: #34d399; }
+        .text-tier-anomaly { color: #fbbf24; }
+        .text-tier-mythic { color: #f87171; }
+        
+        .border-tier-trash { border-color: #475569; }
+        .border-tier-common { border-color: #a855f7; }
+        .border-tier-uncommon { border-color: #3b82f6; }
+        .border-tier-rare { border-color: #06b6d4; }
+        .border-tier-epic { border-color: #10b981; }
+        .border-tier-anomaly { border-color: #f59e0b; }
+        .border-tier-mythic { border-color: #ef4444; }
+    </style>
+</head>
+<body class="h-full flex flex-col font-sans antialiased bg-slate-950 text-slate-100 selection:bg-purple-500 selection:text-white">
+
+    <!-- Header Navigation -->
+    <header class="glass-panel sticky top-0 z-40 border-b border-slate-800/80 px-4 py-3">
+        <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 via-pink-500 to-amber-400 flex items-center justify-center shadow-lg shadow-purple-500/20 font-black text-xl">
+                    <i class="fa-solid fa-dice-d20"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-black tracking-wider bg-gradient-to-r from-purple-400 via-pink-400 to-amber-300 bg-clip-text text-transparent">
+                        RNGdle <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-purple-950/80 text-purple-300 border border-purple-800">39 Families</span>
+                    </h1>
+                    <p class="text-xs text-slate-400">0 to 1,000,000 Infinite RNG & 100+ Authentic Badges</p>
+                </div>
+            </div>
+
+            <!-- Tab Navigation -->
+            <nav class="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded-xl border border-slate-800 text-sm">
+                <button onclick="switchTab('roll')" id="tab-btn-roll" class="tab-btn active px-4 py-2 rounded-lg font-medium transition flex items-center gap-2 bg-purple-600 text-white shadow">
+                    <i class="fa-solid fa-play"></i> Roll
+                </button>
+                <button onclick="switchTab('inventory')" id="tab-btn-inventory" class="tab-btn px-4 py-2 rounded-lg font-medium transition flex items-center gap-2 text-slate-400 hover:text-slate-200 hover:bg-slate-800/50">
+                    <i class="fa-solid fa-box-archive"></i> Inventory
+                    <span id="nav-inventory-count" class="px-1.5 py-0.5 rounded-full bg-slate-800 text-xs font-semibold text-purple-400">0</span>
+                </button>
+                <button onclick="switchTab('badges')" id="tab-btn-badges" class="tab-btn px-4 py-2 rounded-lg font-medium transition flex items-center gap-2 text-slate-400 hover:text-slate-200 hover:bg-slate-800/50">
+                    <i class="fa-solid fa-award"></i> Badges
+                    <span id="nav-badge-progress" class="px-1.5 py-0.5 rounded-full bg-slate-800 text-xs font-semibold text-amber-400">0/0</span>
+                </button>
+                <button onclick="switchTab('stats')" id="tab-btn-stats" class="tab-btn px-4 py-2 rounded-lg font-medium transition flex items-center gap-2 text-slate-400 hover:text-slate-200 hover:bg-slate-800/50">
+                    <i class="fa-solid fa-chart-pie"></i> Stats
+                </button>
+            </nav>
+
+            <!-- Quick Controls -->
+            <div class="flex items-center gap-2">
+                <button onclick="toggleAudio()" id="audio-toggle-btn" class="p-2.5 rounded-xl bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 transition" title="Toggle Sound">
+                    <i class="fa-solid fa-volume-high" id="audio-icon"></i>
+                </button>
+                <button onclick="openSettingsModal()" class="p-2.5 rounded-xl bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 transition" title="Settings & Data">
+                    <i class="fa-solid fa-gear"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main App Body -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 overflow-y-auto">
+
+        <!-- TAB 1: ROLL / PLAY VIEW -->
+        <section id="view-roll" class="tab-view space-y-6">
+            <!-- Hero Roll Display Card -->
+            <div id="main-roll-card" class="glass-panel rounded-3xl p-6 md:p-10 text-center relative overflow-hidden transition-all duration-300 border border-slate-800 shadow-2xl">
+                <!-- Background Accent Glow -->
+                <div id="card-glow" class="absolute -inset-1 bg-gradient-to-r from-purple-600/20 via-pink-600/20 to-amber-600/20 rounded-3xl blur-2xl opacity-50 -z-10 transition-all duration-500"></div>
+
+                <!-- Tier Badge Header -->
+                <div class="flex justify-between items-center mb-6">
+                    <div class="text-left">
+                        <span class="text-xs uppercase font-bold tracking-wider text-slate-400 block mb-0.5">Current Roll Tier</span>
+                        <span id="roll-tier-badge" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black tracking-wide uppercase bg-slate-800 text-slate-300 border border-slate-700">
+                            <i class="fa-solid fa-cube"></i> Ready To Roll
+                        </span>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-xs uppercase font-bold tracking-wider text-slate-400 block mb-0.5">Entropy Score</span>
+                        <span id="roll-ep-display" class="text-xl md:text-2xl font-black text-slate-100">0 <span class="text-xs text-purple-400">EP</span></span>
+                    </div>
+                </div>
+
+                <!-- Rolled Number Main Output -->
+                <div class="py-6 md:py-10">
+                    <div id="rolled-number-text" class="text-5xl sm:text-7xl md:text-8xl font-black tracking-tight font-mono text-slate-100 transition-all duration-150">
+                        000,000
+                    </div>
+                    <div id="percentile-beat" class="mt-3 text-sm text-slate-400 font-medium">
+                        Press ROLL or toggle Auto-Roll to start
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="flex flex-wrap items-center justify-center gap-4 mt-2">
+                    <button id="roll-btn" onclick="triggerManualRoll()" class="px-8 py-4 rounded-2xl bg-gradient-to-r from-purple-600 via-pink-600 to-purple-600 hover:from-purple-500 hover:to-pink-500 text-white font-black text-lg shadow-xl shadow-purple-600/30 active:scale-95 transition transform flex items-center gap-3">
+                        <i class="fa-solid fa-dice text-2xl"></i> ROLL NOW
+                    </button>
+
+                    <div class="flex items-center bg-slate-900/90 p-1.5 rounded-2xl border border-slate-800">
+                        <button id="auto-roll-btn" onclick="toggleAutoRoll()" class="px-5 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-sm transition flex items-center gap-2">
+                            <i class="fa-solid fa-rotate text-purple-400" id="auto-roll-icon"></i>
+                            <span id="auto-roll-label">Auto Roll: OFF</span>
+                        </button>
+                        
+                        <div class="flex items-center gap-1 px-2 border-l border-slate-800">
+                            <button onclick="setAutoSpeed(1)" id="spd-1" class="speed-btn px-2.5 py-1.5 rounded-lg text-xs font-bold bg-purple-600 text-white">1x</button>
+                            <button onclick="setAutoSpeed(2.5)" id="spd-2.5" class="speed-btn px-2.5 py-1.5 rounded-lg text-xs font-bold text-slate-400 hover:bg-slate-800">2.5x</button>
+                            <button onclick="setAutoSpeed(10)" id="spd-10" class="speed-btn px-2.5 py-1.5 rounded-lg text-xs font-bold text-slate-400 hover:bg-slate-800">10x</button>
+                            <button onclick="setAutoSpeed('turbo')" id="spd-turbo" class="speed-btn px-2.5 py-1.5 rounded-lg text-xs font-bold text-amber-400 hover:bg-slate-800">⚡ Max</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Auto Save Filter Setting Bar -->
+                <div class="mt-6 pt-6 border-t border-slate-800/80 flex flex-wrap items-center justify-between text-xs text-slate-400 gap-3">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-floppy-disk text-slate-500"></i>
+                        <span>Auto-Save Inventory Filter:</span>
+                        <select id="auto-save-min-tier" onchange="updateAutoSaveTier(this.value)" class="bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-slate-200 font-medium focus:outline-none focus:border-purple-500">
+                            <option value="trash">Save Everything (All Rolls)</option>
+                            <option value="common">Save Common & Above (≥ 2,087 EP)</option>
+                            <option value="uncommon">Save Uncommon & Above (≥ 5,802 EP)</option>
+                            <option value="rare" selected>Save Rare & Above (≥ 10,074 EP)</option>
+                            <option value="epic">Save Epic & Above (≥ 22,293 EP)</option>
+                            <option value="anomaly">Save Anomaly & Above (≥ 35,469 EP)</option>
+                            <option value="mythic">Save Mythic Only (≥ 162,292 EP)</option>
+                        </select>
+                    </div>
+
+                    <div class="flex items-center gap-4 text-slate-400">
+                        <span>Total Rolls: <strong id="stat-total-rolls" class="text-slate-200">0</strong></span>
+                        <span>Best EP: <strong id="stat-best-ep" class="text-purple-400">0</strong></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Detailed Breakdown & Hit Badges Panel -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Left: Matching Badges in Current Roll -->
+                <div class="lg:col-span-2 glass-panel rounded-2xl p-5 border border-slate-800">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-base font-bold text-slate-200 flex items-center gap-2">
+                            <i class="fa-solid fa-tags text-purple-400"></i>
+                            Active Badges Hit (<span id="active-badges-count">0</span>)
+                        </h3>
+                        <span class="text-xs text-amber-400/90 font-medium bg-amber-950/40 px-2.5 py-1 rounded-md border border-amber-800/50">
+                            <i class="fa-solid fa-filter text-[10px]"></i> 39 Family Deduplication Applied
+                        </span>
+                    </div>
+
+                    <div id="active-badges-list" class="grid grid-cols-1 sm:grid-cols-2 gap-3 min-h-[140px]">
+                        <div class="col-span-full flex flex-col items-center justify-center p-8 text-center text-slate-500 border border-dashed border-slate-800 rounded-xl">
+                            <i class="fa-solid fa-ghost text-3xl mb-2 text-slate-600"></i>
+                            <p class="text-sm font-medium">No badges triggered for this roll yet.</p>
+                            <p class="text-xs text-slate-600">Roll numbers to discover special patterns!</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right: RNGdle EP Formula Inspector -->
+                <div class="glass-panel rounded-2xl p-5 border border-slate-800 flex flex-col justify-between">
+                    <div>
+                        <h3 class="text-base font-bold text-slate-200 mb-3 flex items-center gap-2">
+                            <i class="fa-solid fa-calculator text-emerald-400"></i>
+                            EP Calculation Engine
+                        </h3>
+                        <div class="space-y-3 text-xs">
+                            <div class="flex justify-between items-center py-1.5 border-b border-slate-800">
+                                <span class="text-slate-400">Base Digit Entropy:</span>
+                                <span id="ep-calc-base" class="font-mono font-bold text-slate-200">+0 EP</span>
+                            </div>
+                            <div class="flex justify-between items-center py-1.5 border-b border-slate-800">
+                                <span class="text-slate-400">Raw Badge Sum (All Matches):</span>
+                                <span id="ep-calc-raw" class="font-mono font-bold text-slate-400">+0 EP</span>
+                            </div>
+                            <div class="flex justify-between items-center py-1.5 border-b border-slate-800">
+                                <span class="text-slate-400">Deduplicated Badge Score:</span>
+                                <span id="ep-calc-dedup-sum" class="font-mono font-bold text-emerald-400">+0 EP</span>
+                            </div>
+                            <div class="flex justify-between items-center py-1.5 border-b border-slate-800">
+                                <span class="text-slate-400">Active Families Contributing:</span>
+                                <span id="ep-calc-families" class="font-mono font-bold text-amber-400">0 Families</span>
+                            </div>
+                            <div class="flex justify-between items-center py-2 bg-slate-900/80 px-3 rounded-lg border border-slate-800 mt-2">
+                                <span class="font-bold text-slate-300">Final Calculated EP:</span>
+                                <span id="ep-calc-final" class="font-mono font-black text-sm text-purple-400">0 EP</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tier Threshold Legend -->
+                    <div class="mt-4 pt-4 border-t border-slate-800">
+                        <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">RNGdle Tier Scale</div>
+                        <div class="grid grid-cols-2 gap-1.5 text-[11px]">
+                            <div class="flex items-center gap-1.5 text-tier-trash"><i class="fa-solid fa-circle text-[8px]"></i> Trash: &lt;2,087</div>
+                            <div class="flex items-center gap-1.5 text-tier-common"><i class="fa-solid fa-circle text-[8px]"></i> Common: 2,087</div>
+                            <div class="flex items-center gap-1.5 text-tier-uncommon"><i class="fa-solid fa-circle text-[8px]"></i> Uncom: 5,802</div>
+                            <div class="flex items-center gap-1.5 text-tier-rare"><i class="fa-solid fa-circle text-[8px]"></i> Rare: 10,074</div>
+                            <div class="flex items-center gap-1.5 text-tier-epic"><i class="fa-solid fa-circle text-[8px]"></i> Epic: 22,293</div>
+                            <div class="flex items-center gap-1.5 text-tier-anomaly"><i class="fa-solid fa-circle text-[8px]"></i> Anomaly: 35,469</div>
+                            <div class="col-span-2 flex items-center gap-1.5 text-tier-mythic font-bold"><i class="fa-solid fa-crown text-[10px]"></i> Mythic: ≥ 162,292 EP</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 2: INVENTORY VIEW -->
+        <section id="view-inventory" class="tab-view hidden space-y-4">
+            <!-- Filter & Search Bar -->
+            <div class="glass-panel p-4 rounded-2xl border border-slate-800 flex flex-wrap items-center justify-between gap-4">
+                <div class="flex flex-wrap items-center gap-3 flex-1 min-w-[280px]">
+                    <div class="relative flex-1 min-w-[180px]">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
+                        <input type="text" id="inv-search" oninput="renderInventory()" placeholder="Search number or badge name..." class="w-full bg-slate-900 text-xs rounded-xl pl-9 pr-3 py-2 border border-slate-800 text-slate-200 focus:outline-none focus:border-purple-500">
+                    </div>
+
+                    <select id="inv-tier-filter" onchange="renderInventory()" class="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-purple-500">
+                        <option value="all">All Tiers</option>
+                        <option value="mythic">Mythic</option>
+                        <option value="anomaly">Anomaly</option>
+                        <option value="epic">Epic</option>
+                        <option value="rare">Rare</option>
+                        <option value="uncommon">Uncommon</option>
+                        <option value="common">Common</option>
+                        <option value="trash">Trash</option>
+                    </select>
+
+                    <button id="inv-fav-toggle" onclick="toggleInventoryFavFilter()" class="px-3 py-2 rounded-xl border border-slate-800 bg-slate-900 hover:bg-slate-800 text-xs text-slate-400 font-medium transition flex items-center gap-1.5">
+                        <i class="fa-solid fa-star text-amber-400"></i> Favorites Only
+                    </button>
+                </div>
+
+                <div class="flex items-center gap-3">
+                    <select id="inv-sort" onchange="renderInventory()" class="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-purple-500">
+                        <option value="ep-desc">Highest EP First</option>
+                        <option value="ep-asc">Lowest EP First</option>
+                        <option value="newest">Newest First</option>
+                        <option value="oldest">Oldest First</option>
+                    </select>
+
+                    <button onclick="confirmClearInventory()" class="px-3 py-2 rounded-xl bg-red-950/40 hover:bg-red-900/60 border border-red-800/50 text-red-300 text-xs font-semibold transition" title="Clear Inventory">
+                        <i class="fa-solid fa-trash-can"></i> Clear
+                    </button>
+                </div>
+            </div>
+
+            <!-- Inventory Grid -->
+            <div id="inventory-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <!-- Rendered dynamically -->
+            </div>
+        </section>
+
+        <!-- TAB 3: BADGES DEX VIEW -->
+        <section id="view-badges" class="tab-view hidden space-y-4">
+            <div class="glass-panel p-4 rounded-2xl border border-slate-800 flex flex-wrap items-center justify-between gap-4">
+                <div>
+                    <h2 class="text-base font-bold text-slate-200 flex items-center gap-2">
+                        <i class="fa-solid fa-book-bookmark text-purple-400"></i>
+                        Official RNGdle Badge Codex (39 Families)
+                    </h2>
+                    <p class="text-xs text-slate-400">Collect patterns across all official categories. Deduplication applies per family during roll scoring.</p>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2">
+                    <select id="badge-status-filter" onchange="renderBadgeDex()" class="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200">
+                        <option value="all">All Status (Discovered & Locked)</option>
+                        <option value="discovered">Discovered Only</option>
+                        <option value="locked">Locked Only</option>
+                    </select>
+
+                    <select id="badge-family-filter" onchange="renderBadgeDex()" class="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200">
+                        <option value="all">All 39 Families & Standalone</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Badges Gallery Grid -->
+            <div id="badges-dex-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                <!-- Rendered dynamically -->
+            </div>
+        </section>
+
+        <!-- TAB 4: STATS VIEW -->
+        <section id="view-stats" class="tab-view hidden space-y-6">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="glass-panel p-5 rounded-2xl border border-slate-800">
+                    <div class="text-slate-400 text-xs font-bold uppercase mb-1">Total Rolls Executed</div>
+                    <div id="st-total-rolls" class="text-3xl font-black text-slate-100">0</div>
+                </div>
+
+                <div class="glass-panel p-5 rounded-2xl border border-slate-800">
+                    <div class="text-slate-400 text-xs font-bold uppercase mb-1">Highest EP Roll</div>
+                    <div id="st-max-ep" class="text-3xl font-black text-purple-400">0</div>
+                </div>
+
+                <div class="glass-panel p-5 rounded-2xl border border-slate-800">
+                    <div class="text-slate-400 text-xs font-bold uppercase mb-1">Badges Discovered</div>
+                    <div id="st-badges-unlocked" class="text-3xl font-black text-amber-400">0 / 0</div>
+                </div>
+
+                <div class="glass-panel p-5 rounded-2xl border border-slate-800">
+                    <div class="text-slate-400 text-xs font-bold uppercase mb-1">Mythic Rolls Discovered</div>
+                    <div id="st-mythics-count" class="text-3xl font-black text-red-400">0</div>
+                </div>
+            </div>
+
+            <!-- Tier Breakdown Bars -->
+            <div class="glass-panel p-6 rounded-2xl border border-slate-800">
+                <h3 class="text-sm font-bold text-slate-200 mb-4">Roll Tier Distribution</h3>
+                <div id="tier-distribution-bars" class="space-y-3">
+                    <!-- Dynamic Tier Progress Bars -->
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Settings & Data Management Modal -->
+    <div id="settings-modal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
+        <div class="glass-panel max-w-md w-full rounded-3xl border border-slate-700 p-6 space-y-6">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                <h3 class="text-lg font-bold text-slate-100 flex items-center gap-2">
+                    <i class="fa-solid fa-sliders text-purple-400"></i> Game Settings & Storage
+                </h3>
+                <button onclick="closeSettingsModal()" class="text-slate-400 hover:text-slate-200 text-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="space-y-4 text-xs text-slate-300">
+                <div>
+                    <label class="block font-semibold mb-1 text-slate-400">Sound Synth Volume</label>
+                    <input type="range" id="volume-slider" min="0" max="1" step="0.05" value="0.5" onchange="setVolume(this.value)" class="w-full">
+                </div>
+
+                <div class="pt-2 border-t border-slate-800">
+                    <span class="block font-semibold mb-2 text-slate-400">Data Management</span>
+                    <div class="flex gap-2">
+                        <button onclick="exportDataJSON()" class="flex-1 py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 font-semibold text-purple-300 border border-slate-700 transition flex items-center justify-center gap-1.5">
+                            <i class="fa-solid fa-download"></i> Export JSON
+                        </button>
+                        <button onclick="triggerImportJSON()" class="flex-1 py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 font-semibold text-emerald-300 border border-slate-700 transition flex items-center justify-center gap-1.5">
+                            <i class="fa-solid fa-upload"></i> Import JSON
+                        </button>
+                        <input type="file" id="import-file-input" class="hidden" accept=".json" onchange="importDataJSON(event)">
+                    </div>
+                </div>
+
+                <div class="pt-2 border-t border-slate-800">
+                    <button onclick="resetAllGameData()" class="w-full py-2.5 px-3 rounded-xl bg-red-950/60 hover:bg-red-900 border border-red-700 font-bold text-red-300 transition flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-triangle-exclamation"></i> Reset All Data & Progress
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Toast Container -->
+    <div id="toast-container" class="fixed bottom-4 right-4 z-50 space-y-2 pointer-events-none"></div>
+
+    <!-- MAIN SCRIPT ENGINE -->
+    <script>
+        /* ==========================================================================
+           1. RNGdle TIER DEFINITIONS & HELPER MATH FUNCTIONS
+           ========================================================================== */
+        
+        const TIERS = {
+            TRASH:    { name: 'Trash',    minEP: 0,        class: 'trash',    color: '#64748b' },
+            COMMON:   { name: 'Common',   minEP: 2087,     class: 'common',   color: '#a855f7' },
+            UNCOMMON: { name: 'Uncommon', minEP: 5802,     class: 'uncommon', color: '#3b82f6' },
+            RARE:     { name: 'Rare',     minEP: 10074,    class: 'rare',     color: '#06b6d4' },
+            EPIC:     { name: 'Epic',     minEP: 22293,    class: 'epic',     color: '#10b981' },
+            ANOMALY:  { name: 'Anomaly',  minEP: 35469,    class: 'anomaly',  color: '#f59e0b' },
+            MYTHIC:   { name: 'Mythic',   minEP: 162292,   class: 'mythic',   color: '#ef4444' }
+        };
+
+        function isPrime(num) {
+            if (num <= 1) return false;
+            if (num <= 3) return true;
+            if (num % 2 === 0 || num % 3 === 0) return false;
+            for (let i = 5; i * i <= num; i += 6) {
+                if (num % i === 0 || num % (i + 2) === 0) return false;
+            }
+            return true;
+        }
+
+        function isPerfectPower(n, maxExp = 19) {
+            if (n <= 1) return false;
+            for (let b = 2; b * b <= n; b++) {
+                let p = b * b;
+                let exp = 2;
+                while (p <= n && exp <= maxExp) {
+                    if (p === n) return true;
+                    p *= b;
+                    exp++;
+                }
+            }
+            return false;
+        }
+
+        function isFibonacci(n) {
+            if (n < 0) return false;
+            const isSq = x => Math.sqrt(x) % 1 === 0;
+            return isSq(5 * n * n + 4) || isSq(5 * n * n - 4);
+        }
+
+        function digitSum(n) {
+            return String(n).split('').reduce((acc, curr) => acc + parseInt(curr, 10), 0);
+        }
+
+        function isHarshad(n) {
+            if (n <= 0) return false;
+            const sum = digitSum(n);
+            return n % sum === 0;
+        }
+
+        function isSpyNumber(n) {
+            const digits = String(n).split('').map(Number);
+            const sum = digits.reduce((a, b) => a + b, 0);
+            const prod = digits.reduce((a, b) => a * b, 1);
+            return sum === prod;
+        }
+
+        function isPronic(n) {
+            if (n < 0) return false;
+            const r = Math.floor(Math.sqrt(n));
+            return r * (r + 1) === n;
+        }
+
+        function isStrobogrammatic(s) {
+            const map = { '0':'0', '1':'1', '6':'9', '8':'8', '9':'6' };
+            let l = 0, r = s.length - 1;
+            while (l <= r) {
+                if (!map[s[l]] || map[s[l]] !== s[r]) return false;
+                l++; r--;
+            }
+            return true;
+        }
+
+        /* ==========================================================================
+           2. MASTER AUTHENTIC RNGdle BADGE LIBRARY (100+ BADGES ACROSS 39 FAMILIES)
+           ========================================================================== */
+
+        const BADGE_LIBRARY = [
+            // FAMILY 1: MEANING (Exact Cultural & Meme Matches)
+            { id: 'meaning_exact', name: 'Exact Meaning', family: 'MEANING', ep: 100000100, icon: 'fa-cubes-stacked', desc: 'Roll exact number 000,042', match: n => n === 42 },
+            { id: 'hotbox_exact', name: 'Hotbox', family: 'MEANING', ep: 100000100, icon: 'fa-cannabis', desc: 'Roll exact number 420,420', match: n => n === 420420 },
+            { id: 'jackpot_exact', name: 'Exact Jackpot', family: 'MEANING', ep: 100000100, icon: 'fa-gem', desc: 'Roll exact number 777,777', match: n => n === 777777 },
+            { id: 'groundhog_day', name: 'Groundhog Day', family: 'MEANING', ep: 100000100, icon: 'fa-recycle', desc: 'Roll exact number 000,002', match: n => n === 2 },
+            { id: 'exact_eighty_six', name: 'Exact Eighty-Six', family: 'MEANING', ep: 100000100, icon: 'fa-ban', desc: 'Roll exact number 000,086', match: n => n === 86 },
+
+            // FAMILY 2: MONOTONIC (Poker-style Hand Patterns)
+            { id: 'royal_flush', name: 'Royal Flush', family: 'MONOTONIC', ep: 5000005, icon: 'fa-crown', desc: 'Sequential 1,2,3,4,5,6 or 4,5,6,7,8,9', match: (n,s) => s === '123456' || s === '456789' },
+            { id: 'straight_flush', name: 'Straight Flush', family: 'MONOTONIC', ep: 1449277, icon: 'fa-fire-flame-curved', desc: 'Strictly increasing or decreasing 6 digits', match: (n,s) => '0123456789'.includes(s) || '9876543210'.includes(s) },
+            { id: 'straight', name: 'Straight', family: 'MONOTONIC', ep: 454546, icon: 'fa-arrow-trend-up', desc: 'Digits form an ascending or descending permutation', match: (n,s) => {
+                const sorted = s.split('').map(Number).sort((a,b)=>a-b);
+                for(let i=1; i<sorted.length; i++) if(sorted[i] !== sorted[i-1]+1) return false;
+                return true;
+            }},
+
+            // FAMILY 3: CASCADE
+            { id: 'cascade', name: 'Cascade', family: 'CASCADE', ep: 3333337, icon: 'fa-water', desc: 'Step-like repeated progression e.g. 112233', match: (n,s) => s.length===6 && s[0]===s[1] && s[2]===s[3] && s[4]===s[5] },
+            { id: 'waterfall', name: 'Waterfall', family: 'CASCADE', ep: 2857146, icon: 'fa-cloud-showers-heavy', desc: 'Decreasing pair cascade e.g. 332211', match: (n,s) => s.length===6 && s[0]===s[1] && s[2]===s[3] && s[4]===s[5] && Number(s[0])>Number(s[2]) && Number(s[2])>Number(s[4]) },
+            { id: 'ascension', name: 'Ascension', family: 'CASCADE', ep: 219298, icon: 'fa-arrow-up-right-dots', desc: 'Each consecutive digit is higher or equal', match: (n,s) => s.split('').every((d,i,a) => i===0 || Number(d) >= Number(a[i-1])) },
+            { id: 'decay', name: 'Decay', family: 'CASCADE', ep: 119474, icon: 'fa-arrow-down-short-wide', desc: 'Each consecutive digit is lower or equal', match: (n,s) => s.split('').every((d,i,a) => i===0 || Number(d) <= Number(a[i-1])) },
+            { id: 'steps', name: 'Steps', family: 'CASCADE', ep: 20202, icon: 'fa-stairs', desc: 'Alternating step values', match: (n,s) => s.length===6 && s[0]===s[2] && s[2]===s[4] },
+
+            // FAMILY 4: OF_A_KIND
+            { id: 'mono_6', name: 'Sextuple', family: 'OF_A_KIND', ep: 10000010, icon: 'fa-clone', desc: '6 of a kind (e.g. 888,888)', match: (n,s) => new Set(s).size === 1 },
+            { id: 'mono_5', name: 'Quintuple', family: 'OF_A_KIND', ep: 552487, icon: 'fa-copy', desc: '5 of a kind anywhere in string', match: (n,s) => Object.values(countDigits(s)).includes(5) },
+            { id: 'mono_4', name: 'Quadruple', family: 'OF_A_KIND', ep: 37023, icon: 'fa-layer-group', desc: '4 of a kind anywhere in string', match: (n,s) => Object.values(countDigits(s)).includes(4) },
+
+            // FAMILY 5: CONTIGUOUS_RUN
+            { id: 'contig_6', name: 'Contiguous Sixes', family: 'CONTIGUOUS_RUN', ep: 10000010, icon: 'fa-grip-lines', desc: '6 identical digits in a row', match: (n,s) => /(.)\1{5}/.test(s) },
+            { id: 'contig_5', name: 'Contiguous Fives', family: 'CONTIGUOUS_RUN', ep: 552487, icon: 'fa-bars', desc: '5 identical digits in a row', match: (n,s) => /(.)\1{4}/.test(s) },
+            { id: 'contig_4', name: 'Contiguous Quads', family: 'CONTIGUOUS_RUN', ep: 37023, icon: 'fa-equals', desc: '4 identical digits in a row', match: (n,s) => /(.)\1{3}/.test(s) },
+            { id: 'contig_3', name: 'Contiguous Trips', family: 'CONTIGUOUS_RUN', ep: 2784, icon: 'fa-ellipsis', desc: '3 identical digits in a row', match: (n,s) => /(.)\1{2}/.test(s) },
+
+            // FAMILY 6: NINE_ENDING
+            { id: 'quint_nine', name: 'Quint Nine', family: 'NINE_ENDING', ep: 10000010, icon: 'fa-dice-d6', desc: 'Contains 5 nines', match: (n,s) => (s.match(/9/g)||[]).length === 5 },
+            { id: 'quad_nine', name: 'Quad Nine', family: 'NINE_ENDING', ep: 1000001, icon: 'fa-dice-four', desc: 'Contains 4 nines', match: (n,s) => (s.match(/9/g)||[]).length === 4 },
+            { id: 'triple_nine', name: 'Triple Nine', family: 'NINE_ENDING', ep: 100000, icon: 'fa-dice-three', desc: 'Contains 3 nines', match: (n,s) => (s.match(/9/g)||[]).length === 3 },
+            { id: 'double_nine', name: 'Double Nine', family: 'NINE_ENDING', ep: 10000, icon: 'fa-dice-two', desc: 'Contains 2 nines', match: (n,s) => (s.match(/9/g)||[]).length === 2 },
+            { id: 'nine_ending', name: 'Nine Ending', family: 'NINE_ENDING', ep: 888, icon: 'fa-arrow-right-to-bracket', desc: 'Ends with the digit 9', match: (n,s) => s.endsWith('9') },
+
+            // FAMILY 7: E (Euler's Number Slices)
+            { id: 'e_exact', name: "Euler's Number", family: 'E', ep: 25000025, icon: 'fa-infinity', desc: 'First 6 digits of e (271,828)', match: n => n === 271828 },
+            { id: 'e_slice_5', name: 'E Slice 5', family: 'E', ep: 1250000, icon: 'fa-feather', desc: 'Starts with 27182', match: (n,s) => s.startsWith('27182') },
+            { id: 'e_slice_4', name: 'E Slice 4', family: 'E', ep: 85000, icon: 'fa-feather-pointed', desc: 'Starts with 2718', match: (n,s) => s.startsWith('2718') },
+
+            // FAMILY 8: PI
+            { id: 'pi_exact', name: 'Pi Exact', family: 'PI', ep: 25000025, icon: 'fa-pi', desc: 'First 6 digits of Pi (314,159)', match: n => n === 314159 },
+            { id: 'pi_slice_5', name: 'Pi Slice 5', family: 'PI', ep: 1250000, icon: 'fa-chart-pie', desc: 'Starts with 31415', match: (n,s) => s.startsWith('31415') },
+            { id: 'pi_slice_4', name: 'Pi Slice 4', family: 'PI', ep: 85000, icon: 'fa-circle-notch', desc: 'Starts with 3141', match: (n,s) => s.startsWith('3141') },
+
+            // FAMILY 9: TAU
+            { id: 'tau_exact', name: 'Tau Exact', family: 'TAU', ep: 25000025, icon: 'fa-circle-radiation', desc: 'First 6 digits of Tau (628,318)', match: n => n === 628318 },
+            { id: 'tau_slice_5', name: 'Tau Slice 5', family: 'TAU', ep: 1250000, icon: 'fa-atom', desc: 'Starts with 62831', match: (n,s) => s.startsWith('62831') },
+
+            // FAMILY 10: GOLDEN_RATIO
+            { id: 'phi_exact', name: 'Golden Ratio', family: 'GOLDEN_RATIO', ep: 25000025, icon: 'fa-star-of-life', desc: 'First 6 digits of Phi (161,803)', match: n => n === 161803 },
+
+            // FAMILY 11: PALINDROME
+            { id: 'pal_6', name: 'Full Palindrome', family: 'PALINDROME', ep: 50025, icon: 'fa-arrows-left-right', desc: 'Reads same forwards and backwards', match: (n,s) => s.length >= 5 && s === s.split('').reverse().join('') },
+
+            // FAMILY 12: STROBOGRAMMATIC
+            { id: 'strobogrammatic', name: 'Strobogrammatic', family: 'STROBOGRAMMATIC', ep: 502513, icon: 'fa-rotate', desc: 'Looks identical when upside down (0,1,6,8,9)', match: (n,s) => isStrobogrammatic(s) },
+
+            // FAMILY 13: ZIPPER
+            { id: 'zipper', name: 'Zipper', family: 'ZIPPER', ep: 246914, icon: 'fa-file-zipper', desc: 'Alternating pattern e.g. 121212', match: (n,s) => s.length===6 && s[0]===s[2] && s[2]===s[4] && s[1]===s[3] && s[3]===s[5] && s[0]!==s[1] },
+
+            // FAMILY 14: ECHO
+            { id: 'echo_33', name: 'Echo', family: 'ECHO', ep: 100100, icon: 'fa-retweet', desc: '3-digit repeated block (e.g. 123,123)', match: (n,s) => s.length===6 && s.slice(0,3) === s.slice(3) },
+            { id: 'mini_echo', name: 'Mini Echo', family: 'ECHO', ep: 3704, icon: 'fa-repeat', desc: '2-digit repeated block at start and end', match: (n,s) => s.length===6 && s.slice(0,2) === s.slice(4) },
+
+            // FAMILY 15: FIREFLY
+            { id: 'firefly', name: 'Firefly', family: 'FIREFLY', ep: 82237, icon: 'fa-locust', desc: 'Outer match and center match (e.g. 102201)', match: (n,s) => s.length===6 && s[0]===s[5] && s[1]===s[4] && s[2]===s[3] },
+
+            // FAMILY 16: TURTLE
+            { id: 'turtle', name: 'Turtle', family: 'TURTLE', ep: 36049, icon: 'fa-shield-halved', desc: 'Matching inner core surrounded by identical shell', match: (n,s) => s.length===6 && s[0]===s[1] && s[4]===s[5] },
+
+            // FAMILY 17: BOOKENDS
+            { id: 'bookends', name: 'Bookends', family: 'BOOKENDS', ep: 10010, icon: 'fa-book-open', desc: 'First digit equals last digit', match: (n,s) => s.length===6 && s[0]===s[5] },
+            { id: 'mirror_bookends', name: 'Mirror Bookends', family: 'BOOKENDS', ep: 10010, icon: 'fa-border-all', desc: 'First two digits equal reverse of last two', match: (n,s) => s.length===6 && s[0]===s[5] && s[1]===s[4] },
+            { id: 'paired_bookends', name: 'Paired Bookends', family: 'BOOKENDS', ep: 11122, icon: 'fa-bookmark', desc: 'First two digits equal last two digits', match: (n,s) => s.length===6 && s.slice(0,2) === s.slice(4) },
+
+            // FAMILY 18: JACKPOT
+            { id: 'jackpot_5', name: 'Jackpot Five', family: 'JACKPOT', ep: 77777, icon: 'fa-clover', desc: 'Contains five 7s', match: (n,s) => (s.match(/7/g)||[]).length === 5 },
+            { id: 'jackpot_4', name: 'Jackpot Four', family: 'JACKPOT', ep: 7777, icon: 'fa-coins', desc: 'Contains four 7s', match: (n,s) => (s.match(/7/g)||[]).length === 4 },
+            { id: 'jackpot_3', name: 'Jackpot', family: 'JACKPOT', ep: 777, icon: 'fa-sterling-sign', desc: 'Contains three 7s', match: (n,s) => (s.match(/7/g)||[]).length === 3 },
+
+            // FAMILY 19: DEVIL
+            { id: 'hell', name: 'Hell', family: 'DEVIL', ep: 6666, icon: 'fa-fire', desc: 'Contains four 6s', match: (n,s) => (s.match(/6/g)||[]).length === 4 },
+            { id: 'devil', name: 'Devil', family: 'DEVIL', ep: 666, icon: 'fa-skull', desc: 'Contains three 6s', match: (n,s) => (s.match(/6/g)||[]).length === 3 },
+
+            // FAMILY 20: BOTANIST
+            { id: 'botanist_420', name: 'Botanist', family: 'BOTANIST', ep: 420420, icon: 'fa-seedling', desc: 'Contains 420', match: (n,s) => s.includes('420') },
+
+            // FAMILY 21: NICE
+            { id: 'vv_nice', name: 'Very Very Nice', family: 'NICE', ep: 696969, icon: 'fa-heart', desc: 'Exact string 696969', match: n => n === 696969 },
+            { id: 'v_nice', name: 'Very Nice', family: 'NICE', ep: 6969, icon: 'fa-face-smile', desc: 'Contains 6969', match: (n,s) => s.includes('6969') },
+            { id: 'nice', name: 'Nice', family: 'NICE', ep: 69, icon: 'fa-thumbs-up', desc: 'Contains 69', match: (n,s) => s.includes('69') },
+
+            // FAMILY 22: LEET
+            { id: 'leet', name: 'Leet', family: 'LEET', ep: 1337, icon: 'fa-code', desc: 'Contains 1337', match: (n,s) => s.includes('1337') },
+
+            // FAMILY 23: SECRET_AGENT
+            { id: 'secret_agent', name: 'Secret Agent', family: 'SECRET_AGENT', ep: 700, icon: 'fa-user-secret', desc: 'Contains 007', match: (n,s) => s.includes('007') },
+
+            // FAMILY 24: ERROR
+            { id: 'error_404', name: 'Error 404', family: 'ERROR', ep: 404, icon: 'fa-triangle-exclamation', desc: 'Contains 404', match: (n,s) => s.includes('404') },
+
+            // FAMILY 25: CHEMICAL_ELEMENTS
+            { id: 'hydrogen', name: 'Hydrogen', family: 'CHEMICAL', ep: 101, icon: 'fa-flask', desc: 'Roll exact number 000,001', match: n => n === 1 },
+            { id: 'helium', name: 'Helium', family: 'CHEMICAL', ep: 102, icon: 'fa-vial', desc: 'Roll exact number 000,002', match: n => n === 2 },
+            { id: 'lithium', name: 'Lithium', family: 'CHEMICAL', ep: 103, icon: 'fa-vials', desc: 'Roll exact number 000,003', match: n => n === 3 },
+            { id: 'carbon', name: 'Carbon', family: 'CHEMICAL', ep: 106, icon: 'fa-cube', desc: 'Roll exact number 000,006', match: n => n === 6 },
+            { id: 'oxygen', name: 'Oxygen', family: 'CHEMICAL', ep: 108, icon: 'fa-wind', desc: 'Roll exact number 000,008', match: n => n === 8 },
+            { id: 'fluorine', name: 'Fluorine', family: 'CHEMICAL', ep: 109, icon: 'fa-atom', desc: 'Roll exact number 000,009', match: n => n === 9 },
+
+            // FAMILY 26: DIGIT_COUNT
+            { id: 'single_digit', name: 'Single Digit', family: 'DIGIT_COUNT', ep: 100000, icon: 'fa-1', desc: 'Number under 10', match: n => n < 10 },
+            { id: 'two_digits', name: 'Two Digits', family: 'DIGIT_COUNT', ep: 10000, icon: 'fa-2', desc: 'Number under 100', match: n => n >= 10 && n < 100 },
+            { id: 'three_digits', name: 'Three Digits', family: 'DIGIT_COUNT', ep: 1000, icon: 'fa-3', desc: 'Number under 1,000', match: n => n >= 100 && n < 1000 },
+            { id: 'four_digits', name: 'Four Digits', family: 'DIGIT_COUNT', ep: 100, icon: 'fa-4', desc: 'Number under 10,000', match: n => n >= 1000 && n < 10000 },
+
+            // FAMILY 27: PAIRS
+            { id: 'three_pairs', name: 'Three Pairs', family: 'PAIRS', ep: 15200, icon: 'fa-glasses', desc: 'Formed of 3 separate pairs e.g. 112233', match: (n,s) => {
+                const counts = Object.values(countDigits(s));
+                return counts.filter(c => c === 2).length === 3;
+            }},
+            { id: 'two_pairs', name: 'Two Pairs', family: 'PAIRS', ep: 1200, icon: 'fa-user-group', desc: 'Formed of 2 separate pairs', match: (n,s) => {
+                const counts = Object.values(countDigits(s));
+                return counts.filter(c => c === 2).length === 2;
+            }},
+
+            // FAMILY 28: DUALITY
+            { id: 'binary', name: 'Binary Code', family: 'DUALITY', ep: 45000, icon: 'fa-network-wired', desc: 'Consists of only digits 0 and 1', match: (n,s) => /^[01]+$/.test(s) },
+
+            // FAMILY 29: HOPSCOTCH
+            { id: 'hopscotch', name: 'Hopscotch', family: 'HOPSCOTCH', ep: 18000, icon: 'fa-shoe-prints', desc: 'Even index digits equal odd index digits', match: (n,s) => s.length===6 && s[0]===s[1] && s[2]===s[3] && s[4]===s[5] },
+
+            // FAMILY 30: EQUILIBRIUM
+            { id: 'equilibrium', name: 'Equilibrium', family: 'EQUILIBRIUM', ep: 12500, icon: 'fa-scale-balanced', desc: 'Sum of first 3 digits equals sum of last 3 digits', match: (n,s) => s.length===6 && digitSum(s.slice(0,3)) === digitSum(s.slice(3)) },
+
+            // FAMILY 31: HILLS
+            { id: 'hill', name: 'Hill Pattern', family: 'HILLS', ep: 14000, icon: 'fa-mountain', desc: 'Digits rise to a peak then fall', match: (n,s) => s.length===6 && Number(s[0])<Number(s[1]) && Number(s[1])<Number(s[2]) && Number(s[2])>Number(s[3]) && Number(s[3])>Number(s[4]) },
+
+            // FAMILY 32: BOAT
+            { id: 'valley', name: 'Valley Pattern', family: 'BOAT', ep: 14000, icon: 'fa-sailboat', desc: 'Digits fall to a low point then rise', match: (n,s) => s.length===6 && Number(s[0])>Number(s[1]) && Number(s[1])>Number(s[2]) && Number(s[2])<Number(s[3]) && Number(s[3])<Number(s[4]) },
+
+            // FAMILY 33: BIG_BROTHER
+            { id: 'big_brother', name: '1984 Big Brother', family: 'BIG_BROTHER', ep: 1984, icon: 'fa-eye', desc: 'Contains 1984', match: (n,s) => s.includes('1984') },
+
+            // FAMILY 34: CALENDAR
+            { id: 'year_2024', name: 'Year 2024', family: 'CALENDAR', ep: 2024, icon: 'fa-calendar', desc: 'Contains 2024', match: (n,s) => s.includes('2024') },
+            { id: 'year_2025', name: 'Year 2025', family: 'CALENDAR', ep: 2025, icon: 'fa-calendar-days', desc: 'Contains 2025', match: (n,s) => s.includes('2025') },
+
+            // FAMILY 35: BOOB
+            { id: 'boob', name: 'Calculator BOOB', family: 'BOOB', ep: 8008, icon: 'fa-calculator', desc: 'Contains 8008', match: (n,s) => s.includes('8008') },
+
+            // FAMILY 36: EMERGENCY
+            { id: 'emergency_911', name: 'Emergency 911', family: 'EMERGENCY', ep: 911, icon: 'fa-truck-medical', desc: 'Contains 911', match: (n,s) => s.includes('911') },
+
+            // FAMILY 37: ORIENTATION
+            { id: 'orientation_45', name: 'Degrees 45', family: 'ORIENTATION', ep: 450, icon: 'fa-compass', desc: 'Ends with 45', match: (n,s) => s.endsWith('45') },
+
+            // FAMILY 38: MATH_PROPERTIES (Prime, Fibonacci, Power, Harshad, Spy, Pronic)
+            { id: 'prime', name: 'Prime Number', family: 'MATH_PROPERTIES', ep: 1274, icon: 'fa-square-root-variable', desc: 'Number is a prime integer', match: n => isPrime(n) },
+            { id: 'perfect_power', name: 'Perfect Power', family: 'MATH_PROPERTIES', ep: 15400, icon: 'fa-superscript', desc: 'Integer power x^y (y >= 2)', match: n => isPerfectPower(n) },
+            { id: 'fibonacci', name: 'Fibonacci Term', family: 'MATH_PROPERTIES', ep: 38000, icon: 'fa-diagram-successor', desc: 'Member of Fibonacci sequence', match: n => isFibonacci(n) },
+            { id: 'harshad', name: 'Harshad Number', family: 'MATH_PROPERTIES', ep: 850, icon: 'fa-divide', desc: 'Divisible by the sum of its digits', match: n => isHarshad(n) },
+            { id: 'spy_number', name: 'Spy Number', family: 'MATH_PROPERTIES', ep: 4200, icon: 'fa-user-ninja', desc: 'Sum of digits equals product of digits', match: n => isSpyNumber(n) },
+            { id: 'pronic', name: 'Pronic Number', family: 'MATH_PROPERTIES', ep: 3100, icon: 'fa-square-plus', desc: 'Product of two consecutive integers n(n+1)', match: n => isPronic(n) },
+
+            // FAMILY 39: PARITY_DIVISIBILITY (Even, Odd, Divisible by 3/7/11/13)
+            { id: 'div_13', name: 'Lucky 13 Divisor', family: 'PARITY_DIVISIBILITY', ep: 300, icon: 'fa-percent', desc: 'Divisible by 13', match: n => n > 0 && n % 13 === 0 },
+            { id: 'div_7', name: 'Seven Divisor', family: 'PARITY_DIVISIBILITY', ep: 150, icon: 'fa-divide', desc: 'Divisible by 7', match: n => n > 0 && n % 7 === 0 },
+            { id: 'even', name: 'Even Parity', family: 'PARITY_DIVISIBILITY', ep: 10, icon: 'fa-arrows-split-up-and-left', desc: 'Even integer', match: n => n % 2 === 0 },
+            { id: 'odd', name: 'Odd Parity', family: 'PARITY_DIVISIBILITY', ep: 10, icon: 'fa-code-branch', desc: 'Odd integer', match: n => n % 2 !== 0 }
+        ];
+
+        function countDigits(str) {
+            const counts = {};
+            for (let char of str) counts[char] = (counts[char] || 0) + 1;
+            return counts;
+        }
+
+        /* ==========================================================================
+           3. GLOBAL GAME STATE & LOCAL STORAGE MANAGEMENT
+           ========================================================================== */
+        let state = {
+            rolls: [],
+            unlockedBadges: new Set(),
+            stats: {
+                totalRolls: 0,
+                maxEP: 0,
+                tierCounts: { trash: 0, common: 0, uncommon: 0, rare: 0, epic: 0, anomaly: 0, mythic: 0 }
+            },
+            settings: {
+                autoSaveMinTier: 'rare',
+                soundEnabled: true,
+                volume: 0.5
+            }
+        };
+
+        let autoRollInterval = null;
+        let autoSpeed = 1; // 1x, 2.5x, 10x, 'turbo'
+        let currentTab = 'roll';
+        let inventoryFavOnly = false;
+
+        // Audio Synth Engine
+        let audioCtx = null;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        function playSound(type) {
+            if (!state.settings.soundEnabled) return;
+            try {
+                initAudio();
+                const now = audioCtx.currentTime;
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                const vol = state.settings.volume;
+
+                if (type === 'roll') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(300, now);
+                    osc.frequency.exponentialRampToValueAtTime(150, now + 0.05);
+                    gain.gain.setValueAtTime(vol * 0.15, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+                    osc.start(now);
+                    osc.stop(now + 0.05);
+                } else if (type === 'badge') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(523.25, now); // C5
+                    osc.frequency.setValueAtTime(659.25, now + 0.08); // E5
+                    gain.gain.setValueAtTime(vol * 0.3, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+                    osc.start(now);
+                    osc.stop(now + 0.25);
+                } else if (type === 'mythic') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(440, now);
+                    osc.frequency.exponentialRampToValueAtTime(880, now + 0.4);
+                    gain.gain.setValueAtTime(vol * 0.5, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
+                    osc.start(now);
+                    osc.stop(now + 0.8);
+                }
+            } catch (e) {
+                console.error("Audio synth error", e);
+            }
+        }
+
+        function loadGameData() {
+            try {
+                const saved = localStorage.getItem('RNGdle_v3_Save');
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    state.rolls = parsed.rolls || [];
+                    state.unlockedBadges = new Set(parsed.unlockedBadges || []);
+                    state.stats = parsed.stats || state.stats;
+                    state.settings = { ...state.settings, ...(parsed.settings || {}) };
+                }
+            } catch (e) {
+                console.error('Failed to load save data:', e);
+            }
+            updateUIHeaderStats();
+        }
+
+        function saveGameData() {
+            try {
+                const dataToSave = {
+                    rolls: state.rolls,
+                    unlockedBadges: Array.from(state.unlockedBadges),
+                    stats: state.stats,
+                    settings: state.settings
+                };
+                localStorage.setItem('RNGdle_v3_Save', JSON.stringify(dataToSave));
+            } catch (e) {
+                console.error('Failed to save data:', e);
+            }
+        }
+
+        /* ==========================================================================
+           4. SCORING & 39 FAMILY DEDUPLICATION ENGINE
+           ========================================================================== */
+
+        function evaluateRoll(num) {
+            const formattedStr = String(num).padStart(6, '0');
+            
+            // 1. Calculate Base Digit Entropy
+            let baseEP = 500;
+            const uniqueDigits = new Set(formattedStr).size;
+            baseEP += (6 - uniqueDigits) * 350;
+
+            // 2. Find ALL matching badges
+            const allMatchedBadges = BADGE_LIBRARY.filter(b => b.match(num, formattedStr));
+
+            // 3. APPLY 39 FAMILY DEDUPLICATION RULE
+            // Group matching badges by family and keep only the HIGHEST EP badge per family
+            const familyMap = new Map();
+            allMatchedBadges.forEach(badge => {
+                if (!familyMap.has(badge.family) || familyMap.get(badge.family).ep < badge.ep) {
+                    familyMap.set(badge.family, badge);
+                }
+            });
+
+            const deduplicatedBadges = Array.from(familyMap.values());
+            const deduplicatedBadgeEP = deduplicatedBadges.reduce((sum, b) => sum + b.ep, 0);
+            const rawBadgeEP = allMatchedBadges.reduce((sum, b) => sum + b.ep, 0);
+
+            // 4. Calculate Final Total EP
+            const totalEP = baseEP + deduplicatedBadgeEP;
+
+            // 5. Determine Tier based on authentic RNGdle thresholds
+            let tier = TIERS.TRASH;
+            if (totalEP >= TIERS.MYTHIC.minEP) tier = TIERS.MYTHIC;
+            else if (totalEP >= TIERS.ANOMALY.minEP) tier = TIERS.ANOMALY;
+            else if (totalEP >= TIERS.EPIC.minEP) tier = TIERS.EPIC;
+            else if (totalEP >= TIERS.RARE.minEP) tier = TIERS.RARE;
+            else if (totalEP >= TIERS.UNCOMMON.minEP) tier = TIERS.UNCOMMON;
+            else if (totalEP >= TIERS.COMMON.minEP) tier = TIERS.COMMON;
+
+            return {
+                number: num,
+                strNumber: formattedStr,
+                totalEP: totalEP,
+                baseEP: baseEP,
+                rawBadgeEP: rawBadgeEP,
+                deduplicatedBadgeEP: deduplicatedBadgeEP,
+                allMatchedBadges: allMatchedBadges,
+                deduplicatedBadges: deduplicatedBadges,
+                tier: tier,
+                timestamp: Date.now()
+            };
+        }
+
+        /* ==========================================================================
+           5. ROLLING INTERACTION & ANIMATION LOGIC
+           ========================================================================== */
+
+        function triggerManualRoll() {
+            performRoll(true);
+        }
+
+        function performRoll(isManual = false) {
+            const randomNumber = Math.floor(Math.random() * 1000001);
+            const rollResult = evaluateRoll(randomNumber);
+
+            playSound('roll');
+
+            // Render Rolled Number to DOM
+            const numEl = document.getElementById('rolled-number-text');
+            numEl.textContent = randomNumber.toLocaleString('en-US').padStart(7, '0');
+            
+            // Render Tier & EP
+            const tierBadge = document.getElementById('roll-tier-badge');
+            tierBadge.className = `inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black tracking-wide uppercase bg-tier-${rollResult.tier.class} text-white shadow-lg`;
+            tierBadge.innerHTML = `<i class="fa-solid fa-gem"></i> ${rollResult.tier.name}`;
+
+            const epDisplay = document.getElementById('roll-ep-display');
+            epDisplay.innerHTML = `${rollResult.totalEP.toLocaleString()} <span class="text-xs text-purple-400">EP</span>`;
+            epDisplay.className = `text-xl md:text-2xl font-black text-tier-${rollResult.tier.class}`;
+
+            // Card Glow Effect
+            const glow = document.getElementById('card-glow');
+            glow.style.background = rollResult.tier.color;
+
+            // Percentile Beat Calculation
+            const percentile = Math.min(99.999, Math.max(1, (rollResult.totalEP / 250000) * 100)).toFixed(2);
+            document.getElementById('percentile-beat').innerHTML = `Beats approximately <strong class="text-purple-300">${percentile}%</strong> of standard random rolls!`;
+
+            // Update Breakdown Inspector
+            document.getElementById('ep-calc-base').textContent = `+${rollResult.baseEP.toLocaleString()} EP`;
+            document.getElementById('ep-calc-raw').textContent = `+${rollResult.rawBadgeEP.toLocaleString()} EP`;
+            document.getElementById('ep-calc-dedup-sum').textContent = `+${rollResult.deduplicatedBadgeEP.toLocaleString()} EP`;
+            document.getElementById('ep-calc-families').textContent = `${rollResult.deduplicatedBadges.length} Active Families`;
+            document.getElementById('ep-calc-final').textContent = `${rollResult.totalEP.toLocaleString()} EP`;
+
+            // Update Matched Badges List (With Deduplication Highlights)
+            renderActiveBadges(rollResult.allMatchedBadges, rollResult.deduplicatedBadges);
+
+            // Handle New Badge Discovery Toasts
+            rollResult.deduplicatedBadges.forEach(b => {
+                if (!state.unlockedBadges.has(b.id)) {
+                    state.unlockedBadges.add(b.id);
+                    showToast(`🏆 NEW BADGE DISCOVERED: ${b.name} (+${b.ep.toLocaleString()} EP)`, 'amber');
+                    playSound('badge');
+                }
+            });
+
+            // Handle Mythic / High Roll Effects
+            if (rollResult.tier === TIERS.MYTHIC || rollResult.tier === TIERS.ANOMALY) {
+                confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } });
+                playSound('mythic');
+            }
+
+            // Update Stats
+            state.stats.totalRolls++;
+            state.stats.tierCounts[rollResult.tier.class]++;
+            if (rollResult.totalEP > state.stats.maxEP) {
+                state.stats.maxEP = rollResult.totalEP;
+                showToast(`🚀 NEW HIGH SCORE: ${rollResult.totalEP.toLocaleString()} EP!`, 'purple');
+            }
+
+            // Auto-Save Rule Evaluation
+            const tierHierarchy = ['trash', 'common', 'uncommon', 'rare', 'epic', 'anomaly', 'mythic'];
+            const minTierIdx = tierHierarchy.indexOf(state.settings.autoSaveMinTier);
+            const currentTierIdx = tierHierarchy.indexOf(rollResult.tier.class);
+
+            if (currentTierIdx >= minTierIdx || rollResult.deduplicatedBadges.length > 0) {
+                state.rolls.unshift({
+                    id: 'roll_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+                    num: randomNumber,
+                    str: rollResult.strNumber,
+                    ep: rollResult.totalEP,
+                    tier: rollResult.tier.class,
+                    badges: rollResult.deduplicatedBadges.map(b => b.name),
+                    fav: false,
+                    time: new Date().toLocaleTimeString()
+                });
+                if (state.rolls.length > 250) state.rolls.pop();
+            }
+
+            saveGameData();
+            updateUIHeaderStats();
+        }
+
+        /* Render Active Badges on Roll Card with Deduplication Highlights */
+        function renderActiveBadges(allMatched, deduplicated) {
+            const container = document.getElementById('active-badges-list');
+            const dedupSet = new Set(deduplicated.map(b => b.id));
+            
+            document.getElementById('active-badges-count').textContent = deduplicated.length;
+
+            if (allMatched.length === 0) {
+                container.innerHTML = `
+                    <div class="col-span-full flex flex-col items-center justify-center p-8 text-center text-slate-500 border border-dashed border-slate-800 rounded-xl">
+                        <i class="fa-solid fa-ghost text-2xl mb-1 text-slate-600"></i>
+                        <p class="text-xs font-medium">Standard Number - No badge family matched.</p>
+                    </div>`;
+                return;
+            }
+
+            container.innerHTML = allMatched.map(b => {
+                const isActive = dedupSet.has(b.id);
+                return `
+                    <div class="glass-panel p-3 rounded-xl border ${isActive ? 'border-purple-500/40 bg-purple-950/20' : 'border-slate-800 opacity-40 bg-slate-900/40'} flex items-center justify-between gap-3">
+                        <div class="flex items-center gap-3 min-w-0">
+                            <div class="w-8 h-8 rounded-lg ${isActive ? 'bg-purple-900/50 border border-purple-700 text-purple-300' : 'bg-slate-800 text-slate-500'} flex items-center justify-center text-sm">
+                                <i class="fa-solid ${b.icon}"></i>
+                            </div>
+                            <div class="min-w-0">
+                                <div class="text-xs font-bold text-slate-200 truncate ${!isActive ? 'line-through text-slate-500' : ''}">${b.name}</div>
+                                <div class="text-[10px] text-purple-400 font-mono">+${b.ep.toLocaleString()} EP (${b.family})</div>
+                            </div>
+                        </div>
+                        <span class="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded ${isActive ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-slate-800 text-slate-500'}">
+                            ${isActive ? 'ACTIVE' : 'DEDEDUPED'}
+                        </span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        /* Auto Roll Speed Controls */
+        function toggleAutoRoll() {
+            if (autoRollInterval) {
+                stopAutoRoll();
+            } else {
+                startAutoRoll();
+            }
+        }
+
+        function startAutoRoll() {
+            const btn = document.getElementById('auto-roll-btn');
+            const icon = document.getElementById('auto-roll-icon');
+            const label = document.getElementById('auto-roll-label');
+
+            btn.classList.replace('bg-slate-800', 'bg-purple-600');
+            icon.classList.add('fa-spin');
+            label.textContent = 'Auto Roll: ON';
+
+            const delay = autoSpeed === 'turbo' ? 20 : 1000 / autoSpeed;
+            autoRollInterval = setInterval(() => {
+                performRoll(false);
+            }, delay);
+        }
+
+        function stopAutoRoll() {
+            if (autoRollInterval) {
+                clearInterval(autoRollInterval);
+                autoRollInterval = null;
+            }
+            const btn = document.getElementById('auto-roll-btn');
+            const icon = document.getElementById('auto-roll-icon');
+            const label = document.getElementById('auto-roll-label');
+
+            btn.classList.replace('bg-purple-600', 'bg-slate-800');
+            icon.classList.remove('fa-spin');
+            label.textContent = 'Auto Roll: OFF';
+        }
+
+        function setAutoSpeed(speed) {
+            autoSpeed = speed;
+            document.querySelectorAll('.speed-btn').forEach(b => {
+                b.classList.remove('bg-purple-600', 'text-white');
+                b.classList.add('text-slate-400');
+            });
+
+            const activeBtn = document.getElementById(`spd-${speed}`);
+            if (activeBtn) {
+                activeBtn.classList.add('bg-purple-600', 'text-white');
+                activeBtn.classList.remove('text-slate-400');
+            }
+
+            if (autoRollInterval) {
+                stopAutoRoll();
+                startAutoRoll();
+            }
+        }
+
+        /* ==========================================================================
+           6. INVENTORY & BADGES CODEX TAB RENDERING
+           ========================================================================== */
+
+        function renderInventory() {
+            const grid = document.getElementById('inventory-grid');
+            const searchTerm = document.getElementById('inv-search').value.toLowerCase();
+            const selectedTier = document.getElementById('inv-tier-filter').value;
+            const sortMode = document.getElementById('inv-sort').value;
+
+            let filtered = state.rolls.filter(item => {
+                const matchesSearch = String(item.num).includes(searchTerm) || 
+                                     item.badges.some(b => b.toLowerCase().includes(searchTerm));
+                const matchesTier = selectedTier === 'all' || item.tier === selectedTier;
+                const matchesFav = !inventoryFavOnly || item.fav;
+                return matchesSearch && matchesTier && matchesFav;
+            });
+
+            filtered.sort((a, b) => {
+                if (sortMode === 'ep-desc') return b.ep - a.ep;
+                if (sortMode === 'ep-asc') return a.ep - b.ep;
+                if (sortMode === 'newest') return b.timestamp - a.timestamp;
+                if (sortMode === 'oldest') return a.timestamp - b.timestamp;
+                return 0;
+            });
+
+            if (filtered.length === 0) {
+                grid.innerHTML = `
+                    <div class="col-span-full py-12 text-center text-slate-500">
+                        <i class="fa-solid fa-box-open text-4xl mb-3 text-slate-600"></i>
+                        <p class="text-sm font-medium">No saved rolls found matching filters.</p>
+                    </div>`;
+                return;
+            }
+
+            grid.innerHTML = filtered.map(item => `
+                <div class="glass-panel p-4 rounded-2xl border border-tier-${item.tier} relative group transition">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[10px] uppercase font-black px-2 py-0.5 rounded-md bg-tier-${item.tier} text-white">
+                            ${item.tier}
+                        </span>
+                        <div class="flex items-center gap-2">
+                            <span class="text-[10px] text-slate-500">${item.time}</span>
+                            <button onclick="toggleFavRoll('${item.id}')" class="text-sm ${item.fav ? 'text-amber-400' : 'text-slate-600 hover:text-amber-400'}">
+                                <i class="fa-solid fa-star"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="text-2xl font-black font-mono text-slate-100 my-1">
+                        ${item.num.toLocaleString('en-US').padStart(6, '0')}
+                    </div>
+
+                    <div class="text-xs font-bold text-purple-400 mb-2">
+                        ${item.ep.toLocaleString()} EP
+                    </div>
+
+                    <div class="flex flex-wrap gap-1 text-[10px] text-slate-300">
+                        ${item.badges.map(b => `<span class="bg-slate-900 border border-slate-800 px-1.5 py-0.5 rounded">${b}</span>`).join('') || '<span class="text-slate-600">No Badges</span>'}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function toggleFavRoll(id) {
+            const roll = state.rolls.find(r => r.id === id);
+            if (roll) {
+                roll.fav = !roll.fav;
+                saveGameData();
+                renderInventory();
+            }
+        }
+
+        function toggleInventoryFavFilter() {
+            inventoryFavOnly = !inventoryFavOnly;
+            const btn = document.getElementById('inv-fav-toggle');
+            if (inventoryFavOnly) {
+                btn.classList.add('bg-amber-500/20', 'border-amber-500/50', 'text-amber-300');
+            } else {
+                btn.classList.remove('bg-amber-500/20', 'border-amber-500/50', 'text-amber-300');
+            }
+            renderInventory();
+        }
+
+        function confirmClearInventory() {
+            if (confirm('Are you sure you want to clear saved inventory rolls? Unlocked badges will be preserved.')) {
+                state.rolls = [];
+                saveGameData();
+                renderInventory();
+                updateUIHeaderStats();
+            }
+        }
+
+        /* Render Official 39 Families Badge Dex Gallery */
+        function renderBadgeDex() {
+            const grid = document.getElementById('badges-dex-grid');
+            const familyFilter = document.getElementById('badge-family-filter').value;
+            const statusFilter = document.getElementById('badge-status-filter').value;
+
+            // Populate Families Filter Option Dropdown
+            const families = Array.from(new Set(BADGE_LIBRARY.map(b => b.family)));
+            const filterSelect = document.getElementById('badge-family-filter');
+            if (filterSelect.options.length <= 1) {
+                families.forEach(f => {
+                    const opt = document.createElement('option');
+                    opt.value = f;
+                    opt.textContent = `${f} Family`;
+                    filterSelect.appendChild(opt);
+                });
+            }
+
+            const filteredBadges = BADGE_LIBRARY.filter(b => {
+                const matchesFamily = familyFilter === 'all' || b.family === familyFilter;
+                const isUnlocked = state.unlockedBadges.has(b.id);
+                const matchesStatus = statusFilter === 'all' || 
+                                     (statusFilter === 'discovered' && isUnlocked) || 
+                                     (statusFilter === 'locked' && !isUnlocked);
+                return matchesFamily && matchesStatus;
+            });
+
+            if (filteredBadges.length === 0) {
+                grid.innerHTML = `
+                    <div class="col-span-full py-12 text-center text-slate-500">
+                        <i class="fa-solid fa-award text-4xl mb-3 text-slate-600"></i>
+                        <p class="text-sm font-medium">No badges match the selected filter criteria.</p>
+                    </div>`;
+                return;
+            }
+
+            grid.innerHTML = filteredBadges.map(b => {
+                const unlocked = state.unlockedBadges.has(b.id);
+                return `
+                    <div class="glass-panel p-4 rounded-2xl border ${unlocked ? 'border-amber-500/40 bg-amber-950/10' : 'border-slate-800 opacity-60'} badge-card flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center justify-between mb-2">
+                                <div class="w-10 h-10 rounded-xl ${unlocked ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-slate-900 text-slate-600 border border-slate-800'} flex items-center justify-center text-lg">
+                                    <i class="fa-solid ${b.icon}"></i>
+                                </div>
+                                <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${unlocked ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : 'bg-slate-900 text-slate-500'}">
+                                    ${unlocked ? 'DISCOVERED' : 'LOCKED'}
+                                </span>
+                            </div>
+                            <h4 class="text-xs font-bold text-slate-100">${b.name}</h4>
+                            <div class="text-[10px] font-mono text-purple-400 font-bold mb-1">+${b.ep.toLocaleString()} EP (${b.family})</div>
+                            <p class="text-[11px] text-slate-400 leading-tight">${b.desc}</p>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        /* Render Statistics View */
+        function renderStats() {
+            document.getElementById('st-total-rolls').textContent = state.stats.totalRolls.toLocaleString();
+            document.getElementById('st-max-ep').textContent = `${state.stats.maxEP.toLocaleString()} EP`;
+            document.getElementById('st-badges-unlocked').textContent = `${state.unlockedBadges.size} / ${BADGE_LIBRARY.length}`;
+            document.getElementById('st-mythics-count').textContent = state.stats.tierCounts.mythic || 0;
+
+            const barsContainer = document.getElementById('tier-distribution-bars');
+            const total = state.stats.totalRolls || 1;
+
+            barsContainer.innerHTML = Object.keys(TIERS).map(key => {
+                const tier = TIERS[key];
+                const count = state.stats.tierCounts[tier.class] || 0;
+                const pct = ((count / total) * 100).toFixed(1);
+                return `
+                    <div class="space-y-1">
+                        <div class="flex justify-between text-xs font-medium">
+                            <span class="text-tier-${tier.class} font-bold">${tier.name}</span>
+                            <span class="text-slate-400">${count.toLocaleString()} (${pct}%)</span>
+                        </div>
+                        <div class="w-full bg-slate-900 h-2 rounded-full overflow-hidden border border-slate-800">
+                            <div class="bg-tier-${tier.class} h-full transition-all duration-300" style="width: ${pct}%"></div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        /* Navigation & Settings Management */
+        function switchTab(tab) {
+            currentTab = tab;
+            document.querySelectorAll('.tab-view').forEach(v => v.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(b => {
+                b.classList.remove('bg-purple-600', 'text-white', 'shadow');
+                b.classList.add('text-slate-400');
+            });
+
+            document.getElementById(`view-${tab}`).classList.remove('hidden');
+            const activeBtn = document.getElementById(`tab-btn-${tab}`);
+            activeBtn.classList.add('bg-purple-600', 'text-white', 'shadow');
+            activeBtn.classList.remove('text-slate-400');
+
+            if (tab === 'inventory') renderInventory();
+            if (tab === 'badges') renderBadgeDex();
+            if (tab === 'stats') renderStats();
+        }
+
+        function updateUIHeaderStats() {
+            document.getElementById('nav-inventory-count').textContent = state.rolls.length;
+            document.getElementById('nav-badge-progress').textContent = `${state.unlockedBadges.size}/${BADGE_LIBRARY.length}`;
+            document.getElementById('stat-total-rolls').textContent = state.stats.totalRolls.toLocaleString();
+            document.getElementById('stat-best-ep').textContent = `${state.stats.maxEP.toLocaleString()} EP`;
+        }
+
+        function updateAutoSaveTier(val) {
+            state.settings.autoSaveMinTier = val;
+            saveGameData();
+        }
+
+        function toggleAudio() {
+            state.settings.soundEnabled = !state.settings.soundEnabled;
+            document.getElementById('audio-icon').className = state.settings.soundEnabled ? 'fa-solid fa-volume-high' : 'fa-solid fa-volume-xmark text-red-400';
+            saveGameData();
+        }
+
+        function setVolume(val) {
+            state.settings.volume = parseFloat(val);
+            saveGameData();
+        }
+
+        function openSettingsModal() {
+            document.getElementById('settings-modal').classList.remove('hidden');
+            document.getElementById('settings-modal').classList.add('flex');
+        }
+
+        function closeSettingsModal() {
+            document.getElementById('settings-modal').classList.add('hidden');
+            document.getElementById('settings-modal').classList.remove('flex');
+        }
+
+        function showToast(message, color = 'purple') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `glass-panel px-4 py-3 rounded-2xl border border-${color}-500/50 text-xs font-bold text-slate-100 shadow-xl flex items-center gap-2 animate-bounce-short pointer-events-auto`;
+            toast.innerHTML = `<i class="fa-solid fa-bell text-${color}-400"></i> ${message}`;
+
+            container.appendChild(toast);
+            setTimeout(() => toast.remove(), 3500);
+        }
+
+        /* JSON Data Export / Import */
+        function exportDataJSON() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", `RNGdle_Save_${Date.now()}.json`);
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+        }
+
+        function triggerImportJSON() {
+            document.getElementById('import-file-input').click();
+        }
+
+        function importDataJSON(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const parsed = JSON.parse(e.target.result);
+                    if (parsed && parsed.stats) {
+                        state = parsed;
+                        state.unlockedBadges = new Set(parsed.unlockedBadges || []);
+                        saveGameData();
+                        location.reload();
+                    }
+                } catch (err) {
+                    alert('Invalid JSON Save file structure.');
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function resetAllGameData() {
+            if (confirm('CRITICAL: Reset all progress, inventory, and badge achievements?')) {
+                localStorage.removeItem('RNGdle_v3_Save');
+                location.reload();
+            }
+        }
+
+        // Initialize on Window Load
+        window.onload = function() {
+            loadGameData();
+            renderBadgeDex();
+            performRoll(false);
+        };
+    </script>
+</body>
+</html>
